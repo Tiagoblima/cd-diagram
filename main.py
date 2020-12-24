@@ -4,6 +4,8 @@
 #         Lhassane Idoumghar <lhassane.idoumghar@uha.fr>
 #         Pierre-Alain Muller <pierre-alain.muller@uha.fr>
 # License: GPL3
+import getopt
+import sys
 
 import numpy as np
 import pandas as pd
@@ -20,6 +22,7 @@ import math
 from scipy.stats import wilcoxon
 from scipy.stats import friedmanchisquare
 import networkx
+
 
 # inspired from orange3 https://docs.orange.biolab.si/3/data-mining-library/reference/evaluation.cd.html
 def graph_ranks(avranks, names, p_values, cd=None, cdmethod=None, lowv=None, highv=None,
@@ -275,7 +278,7 @@ def form_cliques(p_values, nnames):
     return networkx.find_cliques(g)
 
 
-def draw_cd_diagram(df_perf=None, alpha=0.05, title=None, labels=False):
+def draw_cd_diagram(df_perf=None, alpha=0.05, title=None, labels=False, filename='cd-diagram.png'):
     """
     Draws the critical difference diagram given the list of pairwise classifiers that are
     significant or not
@@ -287,18 +290,18 @@ def draw_cd_diagram(df_perf=None, alpha=0.05, title=None, labels=False):
     for p in p_values:
         print(p)
 
-
     graph_ranks(average_ranks.values, average_ranks.keys(), p_values,
                 cd=None, reverse=True, width=9, textspace=1.5, labels=labels)
 
     font = {'family': 'sans-serif',
-        'color':  'black',
-        'weight': 'normal',
-        'size': 22,
-        }
+            'color': 'black',
+            'weight': 'normal',
+            'size': 22,
+            }
     if title:
-        plt.title(title,fontdict=font, y=0.9, x=0.5)
-    plt.savefig('cd-diagram.png',bbox_inches='tight')
+        plt.title(title, fontdict=font, y=0.9, x=0.5)
+    plt.savefig(filename, bbox_inches='tight')
+
 
 def wilcoxon_holm(alpha=0.05, df_perf=None):
     """
@@ -378,6 +381,35 @@ def wilcoxon_holm(alpha=0.05, df_perf=None):
     # return the p-values and the average ranks
     return p_values, average_ranks, max_nb_datasets
 
-df_perf = pd.read_csv('DefaultvsTunedvsEnsembleCritDiffAcc.csv',index_col=False)
 
-draw_cd_diagram(df_perf=df_perf, title='Accuracy', labels=True)
+def main(argv):
+    inputfile = ''
+    outputfile = ''
+
+    try:
+
+        opts, args = getopt.getopt(argv, "hi:o:", ["ifile=", "ofile="])
+
+    except getopt.GetoptError:
+        print('test.py -i <inputfile> -o <outputfile>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('test.py -i <inputfile> -o <outputfile>')
+            sys.exit()
+        elif opt in ("-i", "--ifile"):
+            inputfile = arg
+        elif opt in ("-o", "--ofile"):
+            outputfile = arg
+
+    print('Input file: ', inputfile)
+    print('Output file: ', outputfile)
+
+    df_perf = pd.read_csv(inputfile, index_col=False)
+
+    draw_cd_diagram(df_perf=df_perf, title='Accuracy', labels=True, filename=outputfile)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
+
