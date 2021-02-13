@@ -4,6 +4,7 @@
 #         Lhassane Idoumghar <lhassane.idoumghar@uha.fr>
 #         Pierre-Alain Muller <pierre-alain.muller@uha.fr>
 # License: GPL3
+import argparse
 import getopt
 import sys
 
@@ -283,7 +284,7 @@ def draw_cd_diagram(df_perf=None, alpha=0.05, title=None, labels=False, filename
     Draws the critical difference diagram given the list of pairwise classifiers that are
     significant or not
     """
-    p_values, average_ranks, _ = wilcoxon_holm(df_perf=df_perf, alpha=alpha)
+    p_values, average_ranks, _ = wilcoxon_holm(df_perf=df_perf, alpha=alpha, metric=title)
 
     print(average_ranks)
 
@@ -299,11 +300,11 @@ def draw_cd_diagram(df_perf=None, alpha=0.05, title=None, labels=False, filename
             'size': 22,
             }
     if title:
-        plt.title(title, fontdict=font, y=0.9, x=0.5)
+        plt.title(title.capitalize(), fontdict=font, y=0.9, x=0.5)
     plt.savefig(filename, bbox_inches='tight')
 
 
-def wilcoxon_holm(alpha=0.05, df_perf=None):
+def wilcoxon_holm(alpha=0.05, df_perf=None, metric='accuracy'):
     """
     Applies the wilcoxon signed rank test between each pair of algorithm and then use Holm
     to reject the null's hypothesis
@@ -319,7 +320,7 @@ def wilcoxon_holm(alpha=0.05, df_perf=None):
                        ['classifier_name'])
     # test the null hypothesis using friedman before doing a post-hoc analysis
     friedman_p_value = friedmanchisquare(*(
-        np.array(df_perf.loc[df_perf['classifier_name'] == c]['accuracy'])
+        np.array(df_perf.loc[df_perf['classifier_name'] == c][metric])
         for c in classifiers))[1]
     if friedman_p_value >= alpha:
         # then the null hypothesis over the entire classifiers cannot be rejected
@@ -334,14 +335,14 @@ def wilcoxon_holm(alpha=0.05, df_perf=None):
         # get the name of classifier one
         classifier_1 = classifiers[i]
         # get the performance of classifier one
-        perf_1 = np.array(df_perf.loc[df_perf['classifier_name'] == classifier_1]['accuracy']
+        perf_1 = np.array(df_perf.loc[df_perf['classifier_name'] == classifier_1][metric]
                           , dtype=np.float64)
         for j in range(i + 1, m):
             # get the name of the second classifier
             classifier_2 = classifiers[j]
             # get the performance of classifier one
             perf_2 = np.array(df_perf.loc[df_perf['classifier_name'] == classifier_2]
-                              ['accuracy'], dtype=np.float64)
+                              [metric], dtype=np.float64)
             # calculate the p_value
             p_value = wilcoxon(perf_1, perf_2, zero_method='pratt')[1]
             # appen to the list
@@ -366,7 +367,7 @@ def wilcoxon_holm(alpha=0.05, df_perf=None):
     sorted_df_perf = df_perf.loc[df_perf['classifier_name'].isin(classifiers)]. \
         sort_values(['classifier_name', 'dataset_name'])
     # get the rank data
-    rank_data = np.array(sorted_df_perf['accuracy']).reshape(m, max_nb_datasets)
+    rank_data = np.array(sorted_df_perf[metric]).reshape(m, max_nb_datasets)
 
     # create the data frame containg the accuracies
     df_ranks = pd.DataFrame(data=rank_data, index=np.sort(classifiers), columns=
@@ -383,33 +384,20 @@ def wilcoxon_holm(alpha=0.05, df_perf=None):
 
 
 def main(argv):
-    inputfile = ''
-    outputfile = ''
+    parser = argparse.ArgumentParser(description='Process some integers.')
 
-    try:
+    parser.add_argument('--results', type=str, help="The path to the result file")
 
-        opts, args = getopt.getopt(argv, "hi:o:", ["ifile=", "ofile="])
+    parser.add_argument('--img', type=str, help="The path where the cd-diagram image must be saved")
 
-    except getopt.GetoptError:
-        print('test.py -i <inputfile> -o <outputfile>')
-        sys.exit(2)
-    for opt, arg in opts:
-        if opt == '-h':
-            print('test.py -i <inputfile> -o <outputfile>')
-            sys.exit()
-        elif opt in ("-i", "--ifile"):
-            inputfile = arg
-        elif opt in ("-o", "--ofile"):
-            outputfile = arg
+    parser.add_argument('--metric', type=str, help="The metric which must be evaluated")
 
-    print('Input file: ', inputfile)
-    print('Output file: ', outputfile)
+    args = parser.parse_args()
 
-    df_perf = pd.read_csv(inputfile, index_col=False)
+    df_perf = pd.read_csv(args.results, index_col=False)
 
-    draw_cd_diagram(df_perf=df_perf, title='Accuracy', labels=True, filename=outputfile)
+    draw_cd_diagram(df_perf=df_perf, title=args.metric, labels=True, filename=args.img)
 
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-
